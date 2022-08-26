@@ -10,3 +10,4 @@ shared/
 .env
 .DS_Store
 .RData
+.Rhistory
