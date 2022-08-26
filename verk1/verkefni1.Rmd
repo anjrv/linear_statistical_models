@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-## 1. Read in the data and inspect it with `plot()`
+## 1. Start by plotting your data using the `plot()` function
 
 ```{r}
 data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/bjor.csv", 
@@ -29,16 +29,26 @@ data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/bjor.csv
 plot(data)
 ```
 
-## Fit a linear regression model using `lm()` and check the results with `summary()`
+## 2. Fit a linear regression model using the `lm()` function and store the result in an object called `fit.lm`. You can see the results using the `summary()` function.
 
 ```{r}
-lr <- lm(amagn~fjbjor, data)
-summary(lr)
+fit.lm <- lm(amagn~fjbjor, data)
+summary(fit.lm)
 ```
 
-## Use `predict()` to predict the blood alcohol level after 4.5 beers.
+## 3. Give estimates of the parameters of the model along with the value of the coefficient of determination.
+
+
+
+## 4. Use the `predict()` function to predict the alcohol consumption after drinking 4.5 beers
 
 ```{r}
 var_beer <- data.frame(fjbjor=c(4.5))
-predict(lr, var_beer)
+predict(fit.lm, var_beer)
+```
+
+## 5. Give a 95% prediction interval at x~h~ = 4.5
+
+```{r}
+predict(fit.lm, var_beer, interval = 'confidence')
 ```
