@@ -1,0 +1,12 @@
+.Rproj.user/
+data/
+Data/
+shared/
+*cache/
+*_files/
+*.zip
+*.Zip
+*.html
+.env
+.DS_Store
+.RData

@@ -1,0 +1,44 @@
+---
+title: "Verkefni 1"
+author: "Jaan Jaerving"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    code_folding: hide
+---
+
+```{r, setup, results = FALSE, message = FALSE, warning = FALSE}
+options(scipen=999)
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+## 1. Read in the data and inspect it with `plot()`
+
+```{r}
+data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/bjor.csv", 
+                   header = TRUE,
+                   fill = FALSE,
+                   sep = ";",
+                   dec = ".",
+                   na.strings = c("", " ", "NA"),
+                   stringsAsFactors = TRUE)
+
+plot(data)
+```
+
+## Fit a linear regression model using `lm()` and check the results with `summary()`
+
+```{r}
+lr <- lm(amagn~fjbjor, data)
+summary(lr)
+```
+
+## Use `predict()` to predict the blood alcohol level after 4.5 beers.
+
+```{r}
+var_beer <- data.frame(fjbjor=c(4.5))
+predict(lr, var_beer)
+```
