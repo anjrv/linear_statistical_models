@@ -1,6 +1,6 @@
 ---
 title: "Verkefni 1"
-author: "Jaan Jaerving"
+author: "Jaan Jaerving (jaj20@hi.is)"
 output:
   rmdformats::readthedown:
     highlight: kate
@@ -33,22 +33,33 @@ plot(data)
 
 ```{r}
 fit.lm <- lm(amagn~fjbjor, data)
-summary(fit.lm)
+s <- summary(fit.lm)
+
+s
 ```
 
 ## 3. Give estimates of the parameters of the model along with the value of the coefficient of determination.
 
-
+Intercept of the model is **`r s$coefficients[1]`**, slope is **`r s$coefficients[2]`**, sigma is **`r s$sigma`** and coefficient of determination is **`r s$r.squared`**
 
 ## 4. Use the `predict()` function to predict the alcohol consumption after drinking 4.5 beers
 
 ```{r}
 var_beer <- data.frame(fjbjor=c(4.5))
-predict(fit.lm, var_beer)
+pred1 <- predict(fit.lm, var_beer)
+
+pred1
 ```
+
+Prediction for alcohol consumption after 4.5 beers is **`r pred1`**.
 
 ## 5. Give a 95% prediction interval at x~h~ = 4.5
 
 ```{r}
-predict(fit.lm, var_beer, interval = 'confidence')
+# Default confidence is 95%
+pred2 <- predict(fit.lm, var_beer, interval = 'confidence')
+
+pred2
 ```
+
+Lower range for a 95% prediction interval is **`r pred2[2]`** and upper range is **`r pred2[3]`**.
