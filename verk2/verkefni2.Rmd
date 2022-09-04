@@ -14,7 +14,6 @@ knitr::opts_chunk$set(
   warning = FALSE
 )
 
-library(dplyr)
 library(GGally)
 data(stackloss)
 y <- stackloss[, 4]
@@ -49,11 +48,12 @@ Intercept of the model is **`r s.1$coefficients[1]`**, slope is **`r s.1$coeffic
 ## 6. Estimate the parameters of the model without using the `lm()` function
 
 ```{r}
+# Add column of 1 values for intercept
+X <- as.matrix(cbind(1, x1, x2, x3))
 y <- as.matrix(y)
-X <- as.matrix(cbind(x1, x2, x3))
 
-betahat <- solve(t(X) %*% X) %*% (t(X) %*% y)
-betahat
+beta_hat <- solve(t(X) %*% X) %*% (t(X) %*% y)
+beta_hat
 ```
 
 ## 7. Perform an overall F-test using the `anova()` function
