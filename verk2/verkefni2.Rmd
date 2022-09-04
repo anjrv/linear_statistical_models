@@ -14,8 +14,13 @@ knitr::opts_chunk$set(
   warning = FALSE
 )
 
+library(dplyr)
 library(GGally)
 data(stackloss)
+y <- stackloss[, 4]
+x1 <- stackloss[, 1]
+x2 <- stackloss[, 2]
+x3 <- stackloss[, 3]
 ```
 
 ## 1. Start by plotting your data using the `ggpairs()` function from the `GGally` package
@@ -24,14 +29,10 @@ data(stackloss)
 ggpairs(stackloss)
 ```
 
-## 2. Fit a multiple linear regression mo del using the lm() function and store the result in an object called `lm.1`
+## 2. Fit a multiple linear regression model using the lm() function and store the result in an object called `lm.1`
 
 ```{r}
-y<-stackloss[,4]
-x1<-stackloss[,1]
-x2<-stackloss[,2]
-x3<-stackloss[,3]
-lm.1<-lm(y~x1 + x2 + x3)
+lm.1 <- lm(y ~ x1 + x2 + x3)
 
 s.1 <- summary(lm.1)
 s.1
@@ -47,10 +48,18 @@ Intercept of the model is **`r s.1$coefficients[1]`**, slope is **`r s.1$coeffic
 
 ## 6. Estimate the parameters of the model without using the `lm()` function
 
+```{r}
+y <- as.matrix(y)
+X <- as.matrix(cbind(x1, x2, x3))
+
+betahat <- solve(t(X) %*% X) %*% (t(X) %*% y)
+betahat
+```
+
 ## 7. Perform an overall F-test using the `anova()` function
 
 ## 8. Calculate the value of the test statistic in the test above without using the `anova()` function.
 
-## 9. Find a 95% confidence interval for \beta_3 using the `confint()` function
+## 9. Find a 95% confidence interval for $\beta_3$ using the `confint()` function
 
-## 10. Find a 95% confidence interval for \beta_3 without using the `confint()` function
+## 10. Find a 95% confidence interval for $\beta_3$ without using the `confint()` function
