@@ -80,3 +80,7 @@ c1 %>% knitr::kable(caption = "95% confidence interval for β3", row.names=FALSE
 ```
 
 ## 10. Find a 95% confidence interval for $\beta_3$ without using the `confint()` function
+
+```{r}
+
+```
