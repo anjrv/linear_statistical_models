@@ -57,7 +57,7 @@ Prediction for alcohol consumption after 4.5 beers is **`r pred1`**.
 
 ```{r}
 # Default confidence is 95%
-pred2 <- predict(fit.lm, var_beer, interval = 'confidence')
+pred2 <- predict(fit.lm, var_beer, interval = 'prediction')
 
 pred2
 ```
