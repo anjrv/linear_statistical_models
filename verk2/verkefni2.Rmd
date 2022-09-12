@@ -1,6 +1,7 @@
 ---
 title: "Verkefni 2"
-author: "Jaan Jaerving"
+author: "Jaan Jaerving, email: jaj20@hi.is"
+date: "`r Sys.Date()`"
 output:
   rmdformats::readthedown:
     highlight: kate
@@ -44,7 +45,7 @@ Intercept of the model is **`r s.1$coefficients[1]`**, slope is **`r s.1$coeffic
 
 ## 4. State the p-value for the overall F-test $H_0 : \beta_1 = \beta_2 = \beta_3 = 0$
 
-The overall p-value of the overall F-test is **`r pf(s.1$fstatistic[1], s.1$fstatistic[2], s.1$fstatistic[3], lower.tail = FALSE)`**
+The p-value of the overall F-test is **`r pf(s.1$fstatistic[1], s.1$fstatistic[2], s.1$fstatistic[3], lower.tail = FALSE)`**
 
 ## 5. State the p-value for the test $H_0 : \beta_3 = 0$
 
@@ -59,28 +60,42 @@ y <- as.matrix(y)
 
 beta_hat <- solve(t(X) %*% X) %*% (t(X) %*% y)
 rownames(beta_hat) <- c("Intercept","β1","β2","β3")
-beta_hat %>% knitr::kable(caption = "Model parameters")
+beta_hat %>% knitr::kable(caption = "Model parameters without lm()")
 ```
 
 ## 7. Perform an overall F-test using the `anova()` function
 
 ```{r}
 lm.2 <- lm(y ~ 1)
-
-anova(lm.1, lm.2)
+anova(lm.2, lm.1)
 ```
 
 ## 8. Calculate the value of the test statistic in the test above without using the `anova()` function.
+
+```{r}
+rss.1 <- sum(lm.1$res^2)
+rss.2 <- sum(lm.2$res^2)
+df.1 <- lm.1$df.residual
+ms.res <- rss.1 / df.1
+ms.diff <- (rss.2 - rss.1) / (lm.2$df.residual - df.1)
+f.stat <- ms.diff/ms.res
+```
+
+Value of the F statistic is **`r f.stat`**.
 
 ## 9. Find a 95% confidence interval for $\beta_3$ using the `confint()` function
 
 ```{r}
 c1 <- confint(lm.1, "x3")
-c1 %>% knitr::kable(caption = "95% confidence interval for β3", row.names=FALSE)
+c1 %>% knitr::kable(caption = "Confint() 95% confidence interval for β3", row.names=FALSE)
 ```
 
 ## 10. Find a 95% confidence interval for $\beta_3$ without using the `confint()` function
 
 ```{r}
-
+est <- s.1$coefficients[4,1]
+stderr <- s.1$coefficients[4,2]
+t.val <- qt(p=.05/2, df=17, lower.tail=FALSE)
+data.frame(est - t.val * stderr, est + t.val * stderr) %>%
+  knitr::kable(caption = "Manual 95% confidence interval for β3", col.names = c("2.5 %", "97.5 %"),row.names=FALSE)
 ```
