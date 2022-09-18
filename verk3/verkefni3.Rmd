@@ -14,25 +14,29 @@ knitr::opts_chunk$set(
   warning = FALSE
 )
 
+library(GGally)
+
 data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/homeprices.csv", 
                    header = TRUE,
                    fill = FALSE,
                    sep = "",
                    dec = ".",
-                   na.strings = c("", " ", "NA"),
+                   na.strings = c("", " ", "NA" , "*"),
                    stringsAsFactors = TRUE)
 ```
 
 ## 1. Use the `ggpairs()` function to get a feel of the data
 
 ```{r}
-
+ggpairs(data)
 ```
 
-## 2. Fit a linear mo del with PRICE as resp onse variable and SQFT, AGE and FEATS as predictors.
+## 2. Fit a linear model with PRICE as response variable and SQFT, AGE and FEATS as predictors.
 
 ```{r}
-
+lm.1 <- lm(data$PRICE ~ data$SQFT + data$AGE + data$FEATS)
+s.1 <- summary(lm.1)
+s.1
 ```
 
 ## 3. Use the diagnostic tools covered in Chapt. 7 of the Faraway book to detect possible problems with the model. Comment on your findings. Also use the function `tqqplot` in `functions_for_stae312.R` to plot a qq-plot of the studentized residuals (ri) with appropriate bounds.
