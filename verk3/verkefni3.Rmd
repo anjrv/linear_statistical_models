@@ -1,0 +1,42 @@
+---
+title: "Verkefni 3"
+author: "Jaan Jaerving (jaj20@hi.is)"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    code_folding: hide
+---
+
+```{r, setup, results = FALSE, message = FALSE, warning = FALSE}
+options(scipen=999)
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE
+)
+
+data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/homeprices.csv", 
+                   header = TRUE,
+                   fill = FALSE,
+                   sep = "",
+                   dec = ".",
+                   na.strings = c("", " ", "NA"),
+                   stringsAsFactors = TRUE)
+```
+
+## 1. Use the `ggpairs()` function to get a feel of the data
+
+```{r}
+
+```
+
+## 2. Fit a linear mo del with PRICE as resp onse variable and SQFT, AGE and FEATS as predictors.
+
+```{r}
+
+```
+
+## 3. Use the diagnostic tools covered in Chapt. 7 of the Faraway book to detect possible problems with the model. Comment on your findings. Also use the function `tqqplot` in `functions_for_stae312.R` to plot a qq-plot of the studentized residuals (ri) with appropriate bounds.
+
+```{r}
+
+```
