@@ -16,6 +16,48 @@ knitr::opts_chunk$set(
 
 library(GGally)
 
+normalqqplot <- function(x){
+  alpha <- 0.05   # set alpha here
+  n <- length(x)
+  pplot <- (1:n)/(n + 1)
+  plow <- qbeta(alpha/2,(1:n),n-(1:n)+1)
+  pupp <- qbeta(1-alpha/2,(1:n),n-(1:n)+1)
+  qqnorm <- qnorm(pplot)
+  qx_low <- qnorm(plow)
+  qx_upp <- qnorm(pupp)
+  e = (x - mean(x))/sd(x)
+  e_sort <- sort(e)
+  index_e = order(e)
+  figout <- ggplot(data=NULL,aes(x=qqnorm, y=e_sort)) + geom_point() 
+  figout <- figout + geom_line(y = qx_low) + geom_line(y = qx_upp)+geom_line(y = qqnorm) 
+  figout <- figout + xlab("Standard normal quantiles")+ylab("Standardized residuals")
+  figout  <- figout  + geom_text(aes(label = ifelse(e_sort > qx_upp, index_e, "")), hjust = -0.5, vjust=0.4)
+  figout  <- figout  + geom_text(aes(label = ifelse(e_sort < qx_low, index_e, "")), hjust = -0.5, vjust=0.4)
+  figout
+  return(figout)
+}
+
+tqqplot <- function(x,df){
+  alpha <- 0.05  # set alpha here
+  n <- length(x)
+  
+  pplot <- (1:n)/(n + 1)
+  plow <- qbeta(alpha/2,(1:n),n-(1:n)+1)
+  pupp <- qbeta(1-alpha/2,(1:n),n-(1:n)+1)
+  qqt <- qt(pplot,df)
+  qqt_low <- qt(plow,df)
+  qqt_upp <- qt(pupp,df)
+  e_sort <- sort(x)
+  index_e = order(x)
+  figout <- ggplot(data=NULL,aes(x=qqt, y=e_sort)) + geom_point() 
+  figout <- figout + geom_line(y = qqt_low) + geom_line(y = qqt_upp)+geom_line(y = qqt) 
+  figout <- figout + xlab("Standard t quantiles")+ylab("Studentized residuals")
+  figout  <- figout  + geom_text(aes(label = ifelse(e_sort > qqt_upp, index_e, "")), hjust = -0.5, vjust=0.4)
+  figout  <- figout  + geom_text(aes(label = ifelse(e_sort < qqt_low, index_e, "")), hjust = -0.5, vjust=0.4)
+  figout
+  return(figout)
+}
+
 data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/homeprices.csv", 
                    header = TRUE,
                    fill = FALSE,
@@ -34,7 +76,7 @@ ggpairs(data)
 ## 2. Fit a linear model with PRICE as response variable and SQFT, AGE and FEATS as predictors.
 
 ```{r}
-lm.1 <- lm(data$PRICE ~ data$SQFT + data$AGE + data$FEATS)
+lm.1 <- lm(PRICE ~ SQFT + AGE + FEATS, data)
 s.1 <- summary(lm.1)
 s.1
 ```
@@ -42,5 +84,46 @@ s.1
 ## 3. Use the diagnostic tools covered in Chapt. 7 of the Faraway book to detect possible problems with the model. Comment on your findings. Also use the function `tqqplot` in `functions_for_stae312.R` to plot a qq-plot of the studentized residuals (ri) with appropriate bounds.
 
 ```{r}
+par(mfrow=c(2,2))
+plot(lm.1)
+par(mfrow=c(1,1))
+```
 
+From looking at residuals and leverage we can see that values at rows `50`, `89` and potentially `94` are likely outlier values worth looking at. Cook's distance shows us that these values should not have a significant effect on the slope of the regression line however.
+
+```{r}
+jack <- rstudent(lm.1)
+highest_residual <- jack[abs(jack)==max(abs(jack))]
+plot(jack,ylab="Jacknife Residuals",main="Jacknife Residuals")
+```
+
+We see something similar from looking at the Jacknife Residuals. The highest residual at row **`r names(highest_residual)`** has a value of **`r highest_residual`**. Here we can also note that the critical value is **`r qt(.05/(68*2),64)`**
+
+```{r}
+cook <- cooks.distance(lm.1)
+plot(cook,ylab="Cooks distances")
+```
+
+```{r}
+lm.2 <- lm(PRICE ~ SQFT + AGE + FEATS, data, subset=(cook < max(cook)))
+s.2 <- summary(lm.2)
+s.2
+```
+
+Here we construct a new model where we subset out row **94**. We can observe that the intercept of our model changes drastically as a result.
+
+### Using residual plots
+
+```{r}
+par(mfrow=c(1,2))
+plot(lm.1$fit,lm.1$res,xlab="Fitted",ylab="Residuals")
+abline(h=0)
+plot(lm.1$fit,abs(lm.1$res),xlab="Fitted",ylab="|Residuals|")
+par(mfrow=c(1,1))
+```
+
+Checking for non-constant variance directly
+
+```{r}
+summary(lm(abs(lm.1$res) ~ lm.1$fit))
 ```
