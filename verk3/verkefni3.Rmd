@@ -14,6 +14,7 @@ knitr::opts_chunk$set(
   warning = FALSE
 )
 
+library(ggplot2)
 library(GGally)
 
 normalqqplot <- function(x){
@@ -57,7 +58,11 @@ tqqplot <- function(x,df){
   figout
   return(figout)
 }
+```
 
+## 0. Read in data, select columns and remove NA values
+
+```{r}
 data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/homeprices.csv", 
                    header = TRUE,
                    fill = FALSE,
@@ -65,13 +70,19 @@ data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/homepric
                    dec = ".",
                    na.strings = c("", " ", "NA" , "*"),
                    stringsAsFactors = TRUE)
+
+drop <- c("NE", "CUST", "COR", "TAX")
+data <- data[, !(colnames(data) %in% drop)]
+data <- na.omit(data)
 ```
 
 ## 1. Use the `ggpairs()` function to get a feel of the data
 
 ```{r}
-ggpairs(data)
+ggpairs(data, lower = list(continuous = wrap("smooth", alpha = 0.3, size=0.2)))
 ```
+
+In general we can see that `SQFT` has a strong positive effect on `PRICE`. `AGE` on the other hand has a moderate negative effect on `PRICE` values. Properties with more `FEATS` appear to generally trend more expensive but this effect is not sufficient to overcome the other describing variables.
 
 ## 2. Fit a linear model with PRICE as response variable and SQFT, AGE and FEATS as predictors.
 
@@ -81,7 +92,104 @@ s.1 <- summary(lm.1)
 s.1
 ```
 
+Looking at the summary of the model there is a question of whether this model should be refitted without `FEATS` included.
+
 ## 3. Use the diagnostic tools covered in Chapt. 7 of the Faraway book to detect possible problems with the model. Comment on your findings. Also use the function `tqqplot` in `functions_for_stae312.R` to plot a qq-plot of the studentized residuals (ri) with appropriate bounds.
+
+### Residuals
+
+```{r}
+diag <- fortify(lm.1)
+diag$jack <- rstudent(lm.1)
+p1 <- ggplot(diag, aes(x=seq(1:length(.resid)),y=.resid))+geom_point()
+p1 <- p1+geom_hline(yintercept=0, col="red", linetype="dashed")
+p1 <- p1+xlab("Index")+ylab("Residuals")
+p1 <- p1+geom_text(aes(label=ifelse(abs(.resid)>400,row.names(data),"")),
+hjust=-0.1)
+p1
+```
+
+By looking at residuals from diagnostics we see that we have values at indexes `50`, `89` and `94` of our original data set that might be potential outliers.
+
+### Leverages
+
+```{r}
+p <- length(coef(lm.1))
+n <- length(fitted(lm.1))
+p2 <- ggplot(diag, aes(x=seq(1:length(.hat)),y=.hat))+geom_point()
+p2 <- p2+geom_hline(yintercept=2*p/n, col="red", linetype="dashed")
+p2 <- p2+xlab("Index")+ylab("Leverages")
+p2 <- p2+geom_text(aes(label=ifelse(.hat>2*p/n,row.names(data),"")),
+hjust=-0.1)
+p2
+```
+
+### Studentized residuals
+
+```{r}
+p3 <- ggplot(diag, aes(x=seq(1:length(.stdresid)),y=.stdresid))+geom_point()
+p3 <- p3+geom_hline(yintercept=0, col="red", linetype="dashed")
+p3 <- p3+xlab("Index")+ylab("Studentized residuals")
+p3 <- p3+geom_text(aes(label=ifelse(abs(.stdresid)>2,row.names(data),"")),
+hjust=-0.1)
+p3
+```
+
+Moving to studentized residuals we see the same three values `50`, `89` and `94` deviate substantially from the group. `89` specifically appears to be a strong candidate for an outlier value.
+
+### Jacknife residuals
+
+```{r}
+p4 <- ggplot(diag, aes(x=seq(1:length(jack)),y=jack))+geom_point()
+p4 <- p4+geom_hline(yintercept=0, col="red", linetype="dashed")
+p4 <- p4+xlab("Index")+ylab("Jackknife residuals")
+p4 <- p4+geom_text(aes(label=ifelse(abs(jack)>2,row.names(data),"")),
+hjust=-0.1)
+p4
+```
+
+Jacknife largely confirms what we have seen from residuals before.
+
+```{r}
+p5 <- ggplot(diag, aes(x=seq(1:length(.cooksd)),y=.cooksd))+geom_point()
+p5 <- p5+xlab("Index")+ylab("Cooks distance")
+p5 <- p5+geom_text(aes(label=ifelse(.cooksd>0.15,row.names(data),"")),
+hjust=-0.1)
+p5
+```
+
+Cooks distance shows us observations that are influential on the model. Here we see the three values values that we have noted previously but also the value at index `43` of the original data. Here we see that of the three potential outlier values the value at `94` would have the largest effect on the model.
+
+```{r}
+lm.2 <- lm(PRICE ~ SQFT + AGE + FEATS, diag, subset = (.cooksd < max(.cooksd)))
+s.2 <- summary(lm.2)
+s.2
+```
+
+Removing `94` with the highest Cook value changes our intercept rather dramatically and makes it even more likely that we should perhaps move to a model without the `FEATS` column.
+
+### More residual plots
+
+```{r}
+p6<-ggplot(diag, aes(x=.fitted,y=.resid))+geom_point()
+p6<-p6+stat_smooth(method="loess",se=F)+
+geom_hline(yintercept=0, col="red", linetype="dashed")
+p6<-p6+xlab("Fitted")+ylab("Residuals")
+p6
+```
+
+The data is mostly scattered around the vertical line although there is a question of whether there is non-constant variance when looking at how the data scatters as price increases and in that case a transform could be applied to the data.
+
+### QQ-plots
+
+```{r}
+p10 <- ggplot(diag, aes(sample = .stdresid)) + stat_qq()
+p10 <- p10 + geom_abline(slope=1)
+p10 <- p10 + ylab("Studentized residuals")
+p10
+```
+
+Most values fall around the middle line of the graph but there appears to be a curve off at the extremities. This indicates that the outlier values we have been seeing in our other plots are more extreme than would be expected if they came from a normal distribution.
 
 ```{r}
 par(mfrow=c(2,2))
@@ -89,41 +197,9 @@ plot(lm.1)
 par(mfrow=c(1,1))
 ```
 
-From looking at residuals and leverage we can see that values at rows `50`, `89` and potentially `94` are likely outlier values worth looking at. Cook's distance shows us that these values should not have a significant effect on the slope of the regression line however.
+### Tqqplot
 
 ```{r}
-jack <- rstudent(lm.1)
-highest_residual <- jack[abs(jack)==max(abs(jack))]
-plot(jack,ylab="Jacknife Residuals",main="Jacknife Residuals")
+tqqplot(diag$.stdresid, 15)
 ```
 
-We see something similar from looking at the Jacknife Residuals. The highest residual at row **`r names(highest_residual)`** has a value of **`r highest_residual`**. Here we can also note that the critical value is **`r qt(.05/(68*2),64)`**
-
-```{r}
-cook <- cooks.distance(lm.1)
-plot(cook,ylab="Cooks distances")
-```
-
-```{r}
-lm.2 <- lm(PRICE ~ SQFT + AGE + FEATS, data, subset=(cook < max(cook)))
-s.2 <- summary(lm.2)
-s.2
-```
-
-Here we construct a new model where we subset out row **94**. We can observe that the intercept of our model changes drastically as a result.
-
-### Using residual plots
-
-```{r}
-par(mfrow=c(1,2))
-plot(lm.1$fit,lm.1$res,xlab="Fitted",ylab="Residuals")
-abline(h=0)
-plot(lm.1$fit,abs(lm.1$res),xlab="Fitted",ylab="|Residuals|")
-par(mfrow=c(1,1))
-```
-
-Checking for non-constant variance directly
-
-```{r}
-summary(lm(abs(lm.1$res) ~ lm.1$fit))
-```
