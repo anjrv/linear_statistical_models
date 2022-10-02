@@ -1,0 +1,80 @@
+---
+title: "Verkefni 4"
+author: "Jaan Jaerving (jaj20@hi.is)"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    code_folding: hide
+---
+
+```{r, setup, results = FALSE, message = FALSE, warning = FALSE}
+options(scipen=999)
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE
+)
+
+library(ggplot2)
+library(faraway)
+data(twins)
+```
+
+## 1. Fit a model allowing for different intercepts and slopes for the three classes of natural parents. Write out the the equations to use for predicting the IQ of the twins raised by their foster parents from the IQ of the twins raised by their natural parents for the three classes of natural parents.
+
+```{r}
+lm.1 <- lm(Foster~Biological*Social,data=twins)
+s.1 <- summary(lm.1)
+s.1
+```
+
+$$low = `r s.1$coefficients[1]` - `r s.1$coefficients[3]` + x \cdot (`r s.1$coefficients[2]`)  + `r s.1$coefficients[5]`)$$
+
+$$middle = `r s.1$coefficients[1]` - `r s.1$coefficients[4]` + x \cdot (`r s.1$coefficients[2]` + `r s.1$coefficients[6]`)$$
+
+$$high = `r s.1$coefficients[1]` + x \cdot `r s.1$coefficients[2]`$$
+
+```{r}
+p1 <- ggplot(data = cbind(twins, pred = predict(lm.1)),
+aes(x = Biological, y = Foster, color = Social))
+p1 <- p1 + geom_point() + geom_line(aes(y = pred))
+p1
+```
+
+## 2. Fit a model allowing for different intercepts, but same slope, for the three classes of natural parents. Write out the the equations to use for predicting the IQ of the twins raised by their foster parents from the IQ of the twins raised by their natural parents for the three classes of natural parents.
+
+```{r}
+lm.2 <- lm(Foster~Biological+Social,data=twins)
+s.2 <- summary(lm.2)
+s.2
+```
+
+Here we adjust the intercept for each class: 
+$$low = `r s.2$coefficients[1]` - `r s.2$coefficients[3]` + x \cdot `r s.2$coefficients[2]`$$
+
+$$middle = `r s.2$coefficients[1]` - `r s.2$coefficients[4]` + x \cdot `r s.2$coefficients[2]`$$
+
+$$high = `r s.2$coefficients[1]` + x \cdot `r s.2$coefficients[2]`$$
+
+```{r}
+p2 <- ggplot(data = cbind(twins, pred = predict(lm.2)),
+aes(x = Biological, y = Foster, color = Social))
+p2 <- p2 + geom_point() + geom_line(aes(y = pred))
+p2
+```
+
+## 3. Fit a model with the same slope and intercept. Write out the equations to use for predicting the IQ of the twins raised by their foster parents from the IQ of the twins raised by their natural parents for the three classes of natural parents.
+
+```{r}
+lm.3 <- lm(Foster~Biological,data=twins)
+s.3 <- summary(lm.3)
+s.3
+```
+
+This is a standard single slope and single intercept model and the formula for all three classes is the same using: $$`r s.3$coefficients[1]` + x \cdot `r s.3$coefficients[2]`$$
+
+```{r}
+p3 <- ggplot(data = cbind(twins, pred = predict(lm.3)),
+aes(x = Biological, y = Foster, color = Social))
+p3 <- p3 + geom_point() + geom_line(aes(y = pred))
+p3
+```
