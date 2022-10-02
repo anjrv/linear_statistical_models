@@ -27,9 +27,9 @@ s.1 <- summary(lm.1)
 s.1
 ```
 
-$$low = `r s.1$coefficients[1]` - `r s.1$coefficients[3]` + x \cdot (`r s.1$coefficients[2]`)  + `r s.1$coefficients[5]`)$$
+$$low = `r s.1$coefficients[1]` + `r s.1$coefficients[3]` + x \cdot (`r s.1$coefficients[2]`)  + `r s.1$coefficients[5]`)$$
 
-$$middle = `r s.1$coefficients[1]` - `r s.1$coefficients[4]` + x \cdot (`r s.1$coefficients[2]` + `r s.1$coefficients[6]`)$$
+$$middle = `r s.1$coefficients[1]` + `r s.1$coefficients[4]` + x \cdot (`r s.1$coefficients[2]` + `r s.1$coefficients[6]`)$$
 
 $$high = `r s.1$coefficients[1]` + x \cdot `r s.1$coefficients[2]`$$
 
@@ -49,9 +49,9 @@ s.2
 ```
 
 Here we adjust the intercept for each class: 
-$$low = `r s.2$coefficients[1]` - `r s.2$coefficients[3]` + x \cdot `r s.2$coefficients[2]`$$
+$$low = `r s.2$coefficients[1]` + `r s.2$coefficients[3]` + x \cdot `r s.2$coefficients[2]`$$
 
-$$middle = `r s.2$coefficients[1]` - `r s.2$coefficients[4]` + x \cdot `r s.2$coefficients[2]`$$
+$$middle = `r s.2$coefficients[1]` + `r s.2$coefficients[4]` + x \cdot `r s.2$coefficients[2]`$$
 
 $$high = `r s.2$coefficients[1]` + x \cdot `r s.2$coefficients[2]`$$
 
