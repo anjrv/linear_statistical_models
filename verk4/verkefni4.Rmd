@@ -27,7 +27,24 @@ s.1 <- summary(lm.1)
 s.1
 ```
 
-$$low = `r s.1$coefficients[1]` + `r s.1$coefficients[3]` + x \cdot (`r s.1$coefficients[2]`)  + `r s.1$coefficients[5]`)$$
+Assuming:
+  $$d = \begin{array}{ c l }
+    1 & \quad \textrm{if } low \\
+    0 & \quad \textrm{otherwise}
+  \end{array}$$
+  
+  $$e = \begin{array}{ c l }
+    1 & \quad \textrm{if } high \\
+    0 & \quad \textrm{otherwise}
+  \end{array}$$
+
+IQ can be given by the total formula:
+
+$$\hat{y} = \hat{\beta_{0}} + \hat{\beta_{1}} \cdot x + \hat{\beta_{2}} \cdot d + \hat{\beta_{3}} \cdot e + \hat{\beta_{4}} \cdot d \cdot x + \hat{\beta_{5}} \cdot e \cdot x$$
+
+Here each class has an adjusted intercept at 0 as well as different multipliers for slopes:
+
+$$low = `r s.1$coefficients[1]` + `r s.1$coefficients[3]` + x \cdot (`r s.1$coefficients[2]`  + `r s.1$coefficients[5]`)$$
 
 $$middle = `r s.1$coefficients[1]` + `r s.1$coefficients[4]` + x \cdot (`r s.1$coefficients[2]` + `r s.1$coefficients[6]`)$$
 
@@ -48,7 +65,10 @@ s.2 <- summary(lm.2)
 s.2
 ```
 
-Here we adjust the intercept for each class: 
+$$\hat{y} = \hat{\beta_{0}} + \hat{\beta_{1}} \cdot x + \hat{\beta_{2}} \cdot d + \hat{\beta_{3}} \cdot e$$
+
+Here we only adjust the intercept for each class:
+
 $$low = `r s.2$coefficients[1]` + `r s.2$coefficients[3]` + x \cdot `r s.2$coefficients[2]`$$
 
 $$middle = `r s.2$coefficients[1]` + `r s.2$coefficients[4]` + x \cdot `r s.2$coefficients[2]`$$
@@ -70,7 +90,11 @@ s.3 <- summary(lm.3)
 s.3
 ```
 
-This is a standard single slope and single intercept model and the formula for all three classes is the same using: $$`r s.3$coefficients[1]` + x \cdot `r s.3$coefficients[2]`$$
+$$\hat{y} = \hat{\beta_{0}} + \hat{\beta_{1}} \cdot x$$
+
+This is a standard single slope and single intercept model and the formula for all three classes is the same using: 
+
+$$`r s.3$coefficients[1]` + x \cdot `r s.3$coefficients[2]`$$
 
 ```{r}
 p3 <- ggplot(data = cbind(twins, pred = predict(lm.3)),
