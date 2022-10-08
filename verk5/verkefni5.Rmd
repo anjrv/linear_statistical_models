@@ -1,0 +1,65 @@
+---
+title: "Verkefni 5"
+author: "Jaan Jaerving (jaj20@hi.is)"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    code_folding: hide
+---
+
+```{r, setup, results = FALSE, message = FALSE, warning = FALSE}
+options(scipen=999)
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE
+)
+
+library(ggplot2)
+library(dplyr)
+```
+
+## 1: Read the data and subset out the areas of interest
+
+```{r}
+data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/gagnasafn_endurmat2017_litid.csv", 
+                   header = TRUE,
+                   fill = FALSE,
+                   sep = ",",
+                   dec = ".",
+                   na.strings = c("", " ", "NA" , "*"),
+                   stringsAsFactors = TRUE)
+
+# Subset areas:
+# (i)   Vesturbær: Vestan Bræðraborgarstígs   Maps to 11
+# (ii)  Miðbær frá Bræðraborgarstíg að Tjörn  Maps to 25
+# (iii) Háleiti/Skeifa                        Maps to 91
+# (iv)  Grafarvogur: Hamrar, Foldir, Hús      Maps to 120
+# (v)   Hólar, Berg                           Maps to 160
+
+areas <- c(11, 25, 91, 120, 160)
+data <- data[data$matssvaedi %in% areas,]
+
+rm(areas)
+```
+
+## 2: Split the remaining data into training and test sets
+
+```{r}
+sample_rows <- floor(0.75 * nrow(data))
+
+set.seed(42)
+idx <- sample(seq_len(nrow(data)), size = sample_rows)
+
+train <- data[idx, ]
+test <- data[-idx, ]
+
+rm(idx)
+rm(data)
+rm(sample_rows)
+```
+
+## 3: Train data using steps discussed in Statistical Strategy
+
+## 4: Use test data to evaluate the model
+
+## 5: Equation for the final model
