@@ -16,9 +16,13 @@ knitr::opts_chunk$set(
 
 library(ggplot2)
 library(dplyr)
+library(GGally)
+library(MASS)
+library(gridExtra)
+library(olsrr)
 ```
 
-## 1: Read the data and subset out the areas of interest
+## 1 Read the data, subset out the areas of interest and do some initial cleaning
 
 ```{r}
 data <- read.table("/home/anjrv/Projects/linear_statistical_models/data/gagnasafn_endurmat2017_litid.csv", 
@@ -40,9 +44,59 @@ areas <- c(11, 25, 91, 120, 160)
 data <- data[data$matssvaedi %in% areas,]
 
 rm(areas)
+
+head(data, 5)
 ```
 
-## 2: Split the remaining data into training and test sets
+We can read from the documentation that some variables reflect the same properties of the asset, ibteg for example is a simplification of teg_eign based on whether or not the property can be considered single-family detached or multi-family residential. These variables should therefore not be used in tandem. Additionally some variables for the areas selected are variables that present no variation and would not be useful for the model.
+
+```{r}
+data['svfn'] %>%
+  distinct() %>%
+  knitr::kable()
+```
+
+We can also use the property id column to sanity check that there are no duplicate property entries affecting our data.
+
+```{r}
+dupes <- data[duplicated(data$rfastnum)|duplicated(data$rfastnum, fromLast=TRUE),]
+dupes[order(dupes$rfastnum, dupes$kdagur),] %>%
+  head(5) %>%
+  knitr::kable(caption = "Sample duplicate sales of the same property")
+```
+
+We can keep the newest purchase dates for duplicate property purchase rows.
+
+```{r}
+keep <- dupes %>%
+  group_by(rfastnum) %>%
+  slice_max(order_by = kdagur, n = 1)
+
+delete <- anti_join(dupes, keep, by=c('rfastnum','kdagur'))
+
+rm(dupes)
+rm(keep)
+
+data <- data %>% anti_join(delete)
+
+rm(delete)
+```
+
+Finally we can remove the noted aforementioned columns before moving forward.
+
+```{r}
+drop <- c('ibteg','svfn', 'kdagur')
+data <- data[, !(colnames(data) %in% drop)]
+data <- na.omit(data)
+
+data$teg_eign <- as.factor(data$teg_eign)
+data$matssvaedi <- as.factor(data$matssvaedi)
+data$undirmatssvaedi <- as.factor(data$undirmatssvaedi)
+
+rm(drop)
+```
+
+## 2 Split the remaining data into training and test sets
 
 ```{r}
 sample_rows <- floor(0.75 * nrow(data))
@@ -58,8 +112,57 @@ rm(data)
 rm(sample_rows)
 ```
 
-## 3: Train data using steps discussed in Statistical Strategy
+## 3 Train data using steps discussed in Statistical Strategy
 
-## 4: Use test data to evaluate the model
+*Initial factor visualization*
 
-## 5: Equation for the final model
+```{r}
+ggplot(train) +
+   geom_point(aes(x=ibm2, y=nuvirdi, colour=teg_eign, na.rm = TRUE)) +
+   facet_grid(~matssvaedi) +
+   theme(legend.position="bottom") +
+   labs(x='Stærð (Fermetrar)', y='Kaupverð (Í þúsundum króna)', colour="Tegund:")
+```
+
+To start with we can create a model with all the variables to see what we get
+
+```{r}
+lm.1 <- lm(nuvirdi ~ . - rfastnum, train)
+s.1 <- summary(lm.1)
+
+# teg_eign ibm2 fjbilast matssvaedi
+s.1
+```
+
+Somewhat unsurprisingly the variables for area, type of property and size are dominant initially. We can also see that some variables shift much more aggressively than others so a transformation is likely wise.
+
+```{r}
+boxcox(lm.1, lambda = seq(0.0, 1.0, by = 0.1))
+```
+
+From the boxcox plot we see that 0 is not within the confidence interval so we cannot use log directly but we see that $\lambda$ is approximately 0.15 which suggests a transformation of the form
+
+$$\frac{y^{0.15} - 1}{0.15}$$
+Applying this transformation to the response is not satisfactory for the higher price categories however. Eventually it was better to resolve issues within the fitted vs response plot by log transforming ibm2 at which point the suggested transform from boxbox was to also apply a log transform to the response.
+
+```{r}
+# lm(log(nuvirdi) ~ log(ibm2) + fjbilast + fjstof + byggar + matssvaedi + undirmatssvaedi + teg_eign, train)
+# R^2 0.783, RMSE 0.188
+lm.2 <- lm(log(nuvirdi) ~ log(ibm2) + fjbilast + fjstof + byggar + matssvaedi + undirmatssvaedi + teg_eign, train)
+s.2 <- summary(lm.2)
+
+s.2
+```
+
+```{r}
+diag <- fortify(lm.2)
+p<-ggplot(diag, aes(x=.fitted,y=.resid))+geom_point()
+p<-p+stat_smooth(method="loess",se=F)+
+geom_hline(yintercept=0, col="red", linetype="dashed")
+p<-p+xlab("Fitted")+ylab("Residuals")
+p
+```
+
+## 4 Use test data to evaluate the model
+
+## 5 Equation for the final model
