@@ -73,7 +73,7 @@ dupes[order(dupes$rfastnum, dupes$kdagur), ] %>%
   knitr::kable(caption = 'Sample duplicate sales of the same property')
 ```
 
-We can keep the newest purchase dates for duplicate property purchase rows.
+As seen there can be multiple sale entries for the same property. This is effectively a measurement of inflation rather than any of the features of the apartment so it is likely best to keep the newest purchase dates where duplicates exist.
 
 ```{r}
 keep <- dupes %>%
