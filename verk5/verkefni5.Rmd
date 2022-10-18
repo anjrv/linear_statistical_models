@@ -16,13 +16,7 @@ library(ggplot2)
 library(dplyr)
 library(GGally)
 library(MASS)
-
-aic <- function(x) {
-  n <- nrow(x$model)
-  val <- n * log((sum(x$residuals ^ 2) / n)) + (length(x$coefficients) *
-                                                  2)
-  return(val)
-}
+library(stats)
 ```
 
 ## 1 Read the data, subset out the areas of interest and do some initial cleaning
@@ -159,7 +153,7 @@ From the boxcox plot we see that 0 is not within the confidence interval so we c
 $$y^{0.1}$$
 Applying this transformation to the response is not satisfactory for the higher price categories however. Eventually it was better to resolve issues within the fitted vs response plot by log transforming ibm2 at which point the suggested transform from boxcox was to rather apply a negative -0.1 power.
 
-Variable selection was iteratively performed using the `aic()` function defined earlier in the document as well as observing the p-values, RMSE and R-squared. The following model is what the process produced.
+Variable selection was iteratively performed using the `AIC()` function from the stats library as well as observing the p-values, RMSE and R-squared. The following model is what the process produced.
 
 ```{r}
 lm.2 <-
@@ -172,7 +166,7 @@ s.2 <- summary(lm.2)
 s.2
 ```
 
-In addition to the above summary This current selection of variables also resulted in an AIC of `r aic(lm.2)`
+In addition to the above summary This current selection of variables also resulted in an AIC of `r AIC(lm.2)`
 
 ```{r}
 diag <- fortify(lm.2)
@@ -206,7 +200,7 @@ c(RMSE = rmse, R2 = summary(lm.2)$r.squared) %>%
   knitr::kable(col.names = NULL)
 ```
 
-
+This initial model appears to perform reasonable for the purpose of predicting the existing values within the test set. It is likely it could benefit from some additional diagnostics however, from the following plot it seems rather likely that outlier values exist at the high end of the price scale.
 
 ```{r}
 test$predictions <- predictions
@@ -220,7 +214,6 @@ rm(predictions)
 rm(p1)
 ```
 
-This initial model appears to perform reasonable for the purpose of predicting the existing values within the test set. It is likely it could benefit from some additional diagnostics however, from previous plots it seems rather likely that outlier values exist at the high end of the price scale.
 
 ### Additional diagnostics
 
