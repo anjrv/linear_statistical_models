@@ -49,7 +49,19 @@ rm(areas)
 head(data, 5)
 ```
 
-We can read from the documentation that some variables reflect the same properties of the asset, `ibteg` for example is a simplification of `teg_eign` based on whether or not the property can be considered single-family detached or multi-family residential. These variables should therefore not be used in tandem. Additionally some variables for the areas selected are variables that present no variation and would not be useful for the model.
+A quick look at the data columns shows reveals that there are some columns that are not useful for building a model such as the ID column of the properties `rfastnum` as well as some other columns that will not be useful without transforming such as the property purchase dates `kdagur`. We can start by parsing the dates in `kdagur` and scaling them around a median.
+
+```{r}
+dates <- as.numeric(as.Date(data$kdagur, format="%Y-%m-%d"))
+date_mid <- median(dates)
+dates <- scale(dates - date_mid)
+data$date_modifier <- dates[,1]
+
+rm(date_mid)
+rm(dates)
+```
+
+Additionally there are some columns that, for our selected areas, are effectively constants as can be seen for the `svfn` column. This column can be safely removed.
 
 ```{r}
 data['svfn'] %>%
@@ -57,38 +69,13 @@ data['svfn'] %>%
   knitr::kable()
 ```
 
-We can also use the property id column to sanity check that there are no duplicate property entries affecting our data.
+Reading the documentation it also appeared reasonable to break down the building years in a similar manner. This also turned out to be a positive change with regards to model performance later so to condense the report this is included in the initial data section.
 
 ```{r}
-dupes <-
-  data[duplicated(data$rfastnum) |
-         duplicated(data$rfastnum, fromLast = TRUE), ]
-dupes[order(dupes$rfastnum, dupes$kdagur), ] %>%
-  head(5) %>%
-  knitr::kable(caption = 'Sample duplicate sales of the same property')
-```
+data <- data %>%
+  mutate(age_category = ifelse(byggar < 1970, 1, ifelse(byggar > 1985, 3, 2)))
 
-As seen there can be multiple sale entries for the same property. This is effectively a measurement of inflation rather than any of the features of the apartment so it is likely best to keep the newest purchase dates where duplicates exist.
-
-```{r}
-keep <- dupes %>%
-  group_by(rfastnum) %>%
-  slice_max(order_by = kdagur, n = 1)
-
-delete <- anti_join(dupes, keep, by = c('rfastnum', 'kdagur'))
-
-rm(dupes)
-rm(keep)
-
-data <- data %>% anti_join(delete)
-
-rm(delete)
-```
-
-Finally we can remove the noted aforementioned columns before moving forward.
-
-```{r}
-drop <- c('svfn', 'kdagur')
+drop <- c('svfn', 'kdagur', 'byggar')
 data <- data[,!(colnames(data) %in% drop)]
 data <- na.omit(data)
 
@@ -101,6 +88,8 @@ rm(drop)
 ```
 
 ## 2 Split the remaining data into training and test sets
+
+We use a random seed and the number of rows to split into test and train sets.
 
 ```{r}
 sample_rows <- floor(0.75 * nrow(data))
@@ -118,7 +107,7 @@ rm(sample_rows)
 
 ## 3 Train data using steps discussed in Statistical Strategy
 
-*Initial factor visualization*
+To get a feel for the data it felt beneficial to plot out some of the variables and factors that were likely to be important. Specifically area, size and type of housing. In the graph below it is quite evident that detached housing comes at a premium compared to multi family housing.
 
 ```{r}
 ggplot(train) +
@@ -134,134 +123,62 @@ ggplot(train) +
          'Tegund:')
 ```
 
-To start with we can create a model with all the variables to see what we get
+The next step is to fit an initial tentative model to get a feel for any initial transformations and variables.
 
 ```{r}
-lm.1 <- lm(nuvirdi ~ . - rfastnum, train)
-s.1 <- summary(lm.1)
+lm.all <- lm(nuvirdi ~ . - rfastnum, train)
+s.all <- summary(lm.all)
 
-s.1
+s.all
 ```
 
-
-
-Somewhat unsurprisingly the variables for area, type of property and size are dominant initially. We can also see that some variables shift much more aggressively than others so a transformation is likely wise.
+There are some good candidates here to be pruned but before we get into variable selection it is prudent to check for an initial perform.
 
 ```{r}
-boxcox(lm.1, lambda = seq(-0.5, 0.5, by = 0.1))
+boxcox(lm.all, lambda = seq(-0.5, 0.5, by = 0.1))
+```
+$\lambda$ is quite close to 0 for this initial check and it is also within the confidence interval. For initial variable selection a log transform can then be applied.
+
+```{r}
+lm.all <- lm(log(nuvirdi) ~ . - rfastnum, train)
+s.all <- summary(lm.all)
+
+s.all
 ```
 
-From the boxcox plot we see that 0 is not within the confidence interval so we cannot use log directly but we see that $\lambda$ is approximately 0.1 which suggests a transformation of the form
-
-$$y^{0.1}$$
-
-It seems that it could be ideal to also log transform the size of the properties or `ibm2`. As such we can do some variable selection starting with the model `lm(nuvirdi ^ 0.1 ~ . + log(ibm2)- rfastnum - ibm2, train)`
+Starting from the model above Stepwise AIC Backward Regression was applied. The table below shows the variables that were removed throughout the first iteration.
 
 ```{r}
-train <- train %>%
-  mutate(age_category = ifelse(byggar < 1970, 1, ifelse(byggar > 1985, 3, 2)))
+data.frame(variable = c("fjsturt","stig10","fjgeym","fjbkar","lyfta"), aic = c(-1504.682,-1506.093,-1507.257,-1508.270,-1508.379), adj_r_sq = c(0.84697,0.84701,0.84702,0.84703,0.84695)) %>%
+  knitr::kable(caption = "Initially removed variables", col.names = c("Variable", "AIC", "Adj. R-Sq"))
 
-train$age_category <- as.factor(train$age_category)
-
-lm.mid <- lm(nuvirdi ^ -0.1 ~ age_category + lyfta + log(ibm2) + fjbilast + fjgeym + matssvaedi + undirmatssvaedi + teg_eign, train)
-
-summary(lm.mid)
-AIC(lm.mid)
-
-ols_coll_diag(lm.mid)
-
-# Remove in order:
-# fjklos        -4784.464    4.234    15.931    0.79005      0.78651 
-# stig10        -4786.242    4.234    15.930    0.79002      0.78662 
-# fjeld         -4787.891    4.235    15.929    0.78997      0.78671 
-# fjbkar        -4789.089    4.237    15.927    0.78986      0.78674 
-# haednr        -4789.913    4.240    15.924    0.78971      0.78672 
-# fjhaed        -4790.226    4.245    15.920    0.78948      0.78663
-
-# Double check transform, reapply
-# fjsturt       -11186.617    0.073     0.259    0.78098      0.77815 
-# fjherb        -11187.110    0.073     0.259    0.78077      0.77808
-
-# Checking for colinear variables we confirm that teg_eign and ibteg represent the same information so we compare models where we use only one of these two.
-
-# Model with ibteg: AIC -11147.24, Adj R^2 0.772, Std. err 0.00694
-# Model with teg_eign: AIC -11171.76, Adj R^2 0.7758, Std. err 0.006881
-# Model with teg_eign appears to perform better
-# It also appears likely that ibm2 and fjstof are colinear
-# Removing fjstof results in, minimal loss so we go with this
-# AIC -11172.25, Adj R^2 0.7757, Std. err 0.006882
-# Properties of byggar also appear somewhat strange, lets try to factorize this similar to what was suggested in the model construction chapter of the data documentation.
-# AIC -11184.5, Adj R^2 0.7774, Std. err 0.006856
-# This appears to be a positive change
-# Now that we have our variables we can double check our suggested transform and now boxcox lambda is effectively near zero so we log transform nuvirdi
+# No further variables could be removed with backward elimination
+# The next step was to check for colinear variables we see that a large portion of the information provided by fjherb is covered by ibm2. The same can be seen for the relationship between ibteg and teg_eign. These models were tested against each other and the better performing model was kept. This was repeated again and it was revealed that the type of property also had a weaker colinear relationship with the number of floors.
 ```
 
-Applying this transformation to the response is not satisfactory for the higher price categories however. Eventually it was better to resolve issues within the fitted vs response plot by log transforming ibm2 at which point the suggested transform from boxcox was to rather apply a negative -0.1 power.
-
-Variable selection was iteratively performed using the `AIC()` function from the stats library as well as observing the p-values, RMSE and R-squared. The following model is what the process produced.
+After this process it became apparent that log transforming the property size variable `ibm2` would help with the accuracy of the model, checking the performance of the variables after this resulted in some additional removals which are shown below.
 
 ```{r}
-lm.2 <-
-  lm(
-    nuvirdi ^ -0.1 ~ log(ibm2) + fjbilast + fjstof + byggar + matssvaedi + undirmatssvaedi + ibteg,
-    train
-  )
-s.2 <- summary(lm.2)
-
-s.2
+data.frame(variable = c("fjeld","fjklos"), aic = c(-1921.173, -1921.734), adj_r_sq = c(0.87886, 0.87883)) %>%
+  knitr::kable(caption = "Variables removed after transforming size", col.names = c("Variable", "AIC", "Adj. R-Sq"))
 ```
 
-In addition to the above summary This current selection of variables also resulted in an AIC of `r AIC(lm.2)`
+After this step the remaining variables were inspected for collinearity.
 
 ```{r}
-diag <- fortify(lm.mid)
-p <- ggplot(diag, aes(x = .fitted, y = .resid)) + geom_point()
-p <- p + stat_smooth(method = 'loess', se = F) +
-  geom_hline(yintercept = 0,
-             col = 'red',
-             linetype = 'dashed')
-p + xlab('Fitted') + ylab('Residuals')
+lm.vars <- lm(log(nuvirdi) ~ teg_eign + log(ibm2) + fjbilast + fjstof + matssvaedi + undirmatssvaedi, train)
+s.vars <- summary(lm.vars)
 
-rm(diag)
-rm(p)
+s.vars
+```
+
+Double checking the transform after selecting all these variables using `boxcox` shows that $\lambda$ is still close to 0 and 0 is within the confidence interval, so we keep the log transform for our response variable.
+
+```{r}
+boxcox(lm(nuvirdi ~ teg_eign + log(ibm2) + fjbilast + fjstof + matssvaedi + undirmatssvaedi, train), lambda = seq(-0.5, 0.5, by = 0.1))
 ```
 
 ## 4 Use test data to evaluate the model
-
-### Predicting test data
-
-Since the model uses a transformed response variable as well as a transformed prediction for `ibm2` it was necessary to scale these in the test set as well to compare prediction capabilities. The comparative RMSE and the original R-squared can be seen in the following table.
-
-```{r}
-test$nuvirdi <- test$nuvirdi ^ -0.1
-# test['log(ibm2)'] <- log(test$ibm2)
-test <- test %>%
-  mutate(age_category = ifelse(byggar < 1970, 1, ifelse(byggar > 1985, 3, 2)))
-
-test$age_category <- as.factor(test$age_category)
-
-predictions <- predict(lm.mid, test)
-predictions <- predictions ^ (1/-0.1)
-test$nuvirdi <- test$nuvirdi ^ (1/-0.1)
-
-rmse <- sqrt(sum(predictions - test$nuvirdi) ^ 2) / length(test$nuvirdi)
-c(RMSE = rmse, R2 = summary(lm.2)$r.squared) %>%
-  knitr::kable(col.names = NULL)
-```
-
-This initial model appears to perform reasonable for the purpose of predicting the existing values within the test set. It is likely it could benefit from some additional diagnostics however, from the following plot it seems rather likely that outlier values exist at the high end of the price scale.
-
-```{r}
-test$predictions <- predictions
-
-p1 <- ggplot(test, aes(x = nuvirdi, y = predictions)) + geom_point()
-p1 <- p1 + stat_smooth(method = 'loess', se = F)
-p1 <- p1 + xlab('Real') + ylab('Prediction')
-p1 + xlim(0, 110000)+ylim(0, 110000)
-
-rm(predictions)
-rm(p1)
-```
 
 
 ### Additional diagnostics
