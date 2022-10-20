@@ -105,7 +105,7 @@ rm(drop)
 ```{r}
 sample_rows <- floor(0.75 * nrow(data))
 
-set.seed(12)
+set.seed(35)
 idx <- sample(seq_len(nrow(data)), size = sample_rows)
 
 train <- data[idx,]
@@ -163,7 +163,7 @@ train <- train %>%
 
 train$age_category <- as.factor(train$age_category)
 
-lm.mid <- lm(log(nuvirdi) ~ age_category + lyfta + log(ibm2) + fjbilast + fjgeym + matssvaedi + undirmatssvaedi + teg_eign, train)
+lm.mid <- lm(nuvirdi ^ -0.1 ~ age_category + lyfta + log(ibm2) + fjbilast + fjgeym + matssvaedi + undirmatssvaedi + teg_eign, train)
 
 summary(lm.mid)
 AIC(lm.mid)
@@ -193,6 +193,7 @@ ols_coll_diag(lm.mid)
 # Properties of byggar also appear somewhat strange, lets try to factorize this similar to what was suggested in the model construction chapter of the data documentation.
 # AIC -11184.5, Adj R^2 0.7774, Std. err 0.006856
 # This appears to be a positive change
+# Now that we have our variables we can double check our suggested transform and now boxcox lambda is effectively near zero so we log transform nuvirdi
 ```
 
 Applying this transformation to the response is not satisfactory for the higher price categories however. Eventually it was better to resolve issues within the fitted vs response plot by log transforming ibm2 at which point the suggested transform from boxcox was to rather apply a negative -0.1 power.
@@ -232,16 +233,16 @@ rm(p)
 Since the model uses a transformed response variable as well as a transformed prediction for `ibm2` it was necessary to scale these in the test set as well to compare prediction capabilities. The comparative RMSE and the original R-squared can be seen in the following table.
 
 ```{r}
-test$nuvirdi <- log(test$nuvirdi)
-test['log(ibm2)'] <- log(test$ibm2)
+test$nuvirdi <- test$nuvirdi ^ -0.1
+# test['log(ibm2)'] <- log(test$ibm2)
 test <- test %>%
   mutate(age_category = ifelse(byggar < 1970, 1, ifelse(byggar > 1985, 3, 2)))
 
 test$age_category <- as.factor(test$age_category)
 
 predictions <- predict(lm.mid, test)
-predictions <- exp(predictions)
-test$nuvirdi <- exp(test$nuvirdi)
+predictions <- predictions ^ (1/-0.1)
+test$nuvirdi <- test$nuvirdi ^ (1/-0.1)
 
 rmse <- sqrt(sum(predictions - test$nuvirdi) ^ 2) / length(test$nuvirdi)
 c(RMSE = rmse, R2 = summary(lm.2)$r.squared) %>%
