@@ -4,7 +4,7 @@ author: 'Jaan Jaerving (jaj20@hi.is)'
 output:
   rmdformats::readthedown:
     highlight: kate
-    code_folding: show
+    code_folding: hide
 ---
 
 ```{r, setup, results = FALSE, message = FALSE, warning = FALSE}
@@ -17,7 +17,6 @@ library(dplyr)
 library(GGally)
 library(MASS)
 library(stats)
-library(olsrr)
 ```
 
 ## 1 Read the data, subset out the areas of interest and do some initial cleaning
@@ -94,7 +93,7 @@ We use a random seed and the number of rows to split into test and train sets.
 ```{r}
 sample_rows <- floor(0.75 * nrow(data))
 
-set.seed(35)
+set.seed(32) # 35, 2, 4, 11!
 idx <- sample(seq_len(nrow(data)), size = sample_rows)
 
 train <- data[idx,]
@@ -132,15 +131,15 @@ s.all <- summary(lm.all)
 s.all
 ```
 
-There are some good candidates here to be pruned but before we get into variable selection it is prudent to check for an initial perform.
+There are some good candidates here to be pruned but before we get into variable selection it is prudent to check for an initial transform.
 
 ```{r}
 boxcox(lm.all, lambda = seq(-0.5, 0.5, by = 0.1))
 ```
-$\lambda$ is quite close to 0 for this initial check and it is also within the confidence interval. For initial variable selection a log transform can then be applied.
+Here $\lambda$ is not quite 0 and 0 is not within the confidence interval so initially we cannot apply a direct log transform. For initial variable selection we can start off with a $y^{0.1}$ power transform and check back later.
 
 ```{r}
-lm.all <- lm(log(nuvirdi) ~ . - rfastnum, train)
+lm.all <- lm(nuvirdi ^ 0.1 ~ . - rfastnum, train)
 s.all <- summary(lm.all)
 
 s.all
@@ -149,6 +148,9 @@ s.all
 Starting from the model above Stepwise AIC Backward Regression was applied. The table below shows the variables that were removed throughout the first iteration.
 
 ```{r}
+rm(lm.all)
+rm(s.all)
+
 data.frame(variable = c("fjsturt","stig10","fjgeym","fjbkar","lyfta"), aic = c(-1504.682,-1506.093,-1507.257,-1508.270,-1508.379), adj_r_sq = c(0.84697,0.84701,0.84702,0.84703,0.84695)) %>%
   knitr::kable(caption = "Initially removed variables", col.names = c("Variable", "AIC", "Adj. R-Sq"))
 
@@ -158,29 +160,189 @@ data.frame(variable = c("fjsturt","stig10","fjgeym","fjbkar","lyfta"), aic = c(-
 
 After this process it became apparent that log transforming the property size variable `ibm2` would help with the accuracy of the model, checking the performance of the variables after this resulted in some additional removals which are shown below.
 
+*NOTE: The AIC and R-Sq values are not adjusted between transforms so the stepwise variable removal can only be compared from the context of those current transformations*
+
 ```{r}
-data.frame(variable = c("fjeld","fjklos"), aic = c(-1921.173, -1921.734), adj_r_sq = c(0.87886, 0.87883)) %>%
-  knitr::kable(caption = "Variables removed after transforming size", col.names = c("Variable", "AIC", "Adj. R-Sq"))
+data.frame(variable = c("fjklos","fjeld", "haednr"), aic = c(-777.824, -779.672, -781.517), adj_r_sq = c(0.76787 , 0.76798, 0.76810)) %>%
+  knitr::kable(caption = "Variables removed after transforming size (ibm2)", col.names = c("Variable", "AIC", "Adj. R-Sq"))
 ```
 
-After this step the remaining variables were inspected for collinearity.
+At this point no variables could be removed with this method. Some area subcategories presented high p-values but others were significant and as such this factor variable could not be removed.
 
 ```{r}
-lm.vars <- lm(log(nuvirdi) ~ teg_eign + log(ibm2) + fjbilast + fjstof + matssvaedi + undirmatssvaedi, train)
+lm.vars <- lm(log(nuvirdi) ~ teg_eign + log(ibm2) + fjbilast + matssvaedi + undirmatssvaedi + ibteg + date_modifier + age_category, train)
 s.vars <- summary(lm.vars)
 
 s.vars
 ```
 
-Double checking the transform after selecting all these variables using `boxcox` shows that $\lambda$ is still close to 0 and 0 is within the confidence interval, so we keep the log transform for our response variable.
+After this selection process the remaining variables were inspected for collinearity.
 
 ```{r}
-boxcox(lm(nuvirdi ~ teg_eign + log(ibm2) + fjbilast + fjstof + matssvaedi + undirmatssvaedi, train), lambda = seq(-0.5, 0.5, by = 0.1))
+data.frame(variable = c("Removed - fjherb (collinear with ibm2)", "Removed - fjhaed (collinear with ibteg)", "Removed - fjstof (collinear with ibteg)")) %>%
+  knitr::kable(caption = "Variables adjusted for collinearity", col.names = c("Variable"))
 ```
+
+Double checking the transform after selecting all these variables using `boxcox` shows that $\lambda$ is now close to 0, so we can log transform for response variable.
+
+```{r}
+boxcox(lm(log(nuvirdi) ~ teg_eign + log(ibm2) + fjbilast + matssvaedi + undirmatssvaedi + ibteg + date_modifier + age_category, train), lambda = seq(-0.5, 0.5, by = 0.1))
+```
+
+### Model diagnostics
+
+```{r}
+diag <- fortify(lm.vars)
+diag$.index = c(1:length(diag$.resid))
+diag$jack<-rstudent(lm.vars)
+res_sd <- summary(lm.vars)$sigma
+p <- ggplot(diag, aes(x = seq(1:length(.resid)), y = .resid)) + geom_point()
+p <- p + geom_hline(yintercept = 0, col = "red", linetype = "dashed")
+p <- p + geom_hline(yintercept = 2 * res_sd, col = "blue", linetype = "dashed")
+p <- p + geom_hline(yintercept = -2 * res_sd, col = "blue",
+linetype = "dashed")
+p <- p + geom_hline(yintercept = 3 * res_sd, col = "green",
+linetype = "dashed")
+p <- p + geom_hline(yintercept = -3 * res_sd, col = "green",
+linetype = "dashed")
+p <- p + xlab("Index") + ylab("Residuals") + labs(title = "Index plot of residuals")
+p + geom_text(aes(label = ifelse(abs(.resid) > 2 * res_sd,
+.index, "")), hjust = -0.5, vjust = 0.4)
+
+rm(p)
+```
+
+Since this is a larger dataset there are quite a few points that are two standard deviations away from the mean. There are also about 12 points that are three standard deviations from the mean. We can keep an eye out for these index points.
+
+```{r}
+len_1<-length(coef(lm.vars))
+len_2<-length(fitted(lm.vars))
+diag[13,4] <- 8
+p<-ggplot(diag, aes(x=seq(1:length(.hat)),y=.hat))+geom_point()
+p<-p+geom_hline(yintercept=2*len_1/len_2, col="red", linetype="dashed")
+p<-p+xlab("Index")+ylab("Leverages")
+p+geom_text(aes(label=ifelse(.hat>2*len_1/len_2,.index,"")),hjust=0, vjust=0)
+
+rm(p)
+```
+
+There is a substantial number of points that might have strong leverage on our results. Skimming through these values they are not abnormal but many of these high leverage properties appear to be from subareas that are marked desirable.
+
+```{r}
+stres_sd <- sd(diag$.stdresid)
+p <- ggplot(diag,aes(x=seq(1:length(.stdresid)),y=.stdresid))+geom_point()
+p <- p + geom_hline(yintercept=0, col="red", linetype="dashed")
+p <- p + geom_hline(yintercept=2*stres_sd, col="blue", linetype="dashed")
+p <- p + geom_hline(yintercept=-2*stres_sd, col="blue", linetype="dashed")
+p <- p + geom_hline(yintercept=3*stres_sd, col="green", linetype="dashed")
+p <- p + geom_hline(yintercept=-3*stres_sd, col="green", linetype="dashed")
+p <- p + xlab("Index")+ylab("Studentized residuals")+labs(title = "Index plot of std.")
+p + geom_text(aes(label=ifelse(abs(.stdresid)>2*stres_sd,.index,"")),hjust=-0.5, vjust=0.4)
+
+rm(p)
+```
+From here we can see that the point at index 1419 is the most extreme point in the dataset. Looking at that value directly it does not appear to have incorrect data and seems to be normal.
+
+```{r}
+diag$.jack<-rstudent(lm.vars) 
+
+# Jackknife index plot
+p<-ggplot(diag, aes(x=seq(1:length(.jack)),y=.jack))+geom_point()
+p<-p+geom_hline(yintercept=0, col="red", linetype="dashed")
+p<-p+xlab("Index")+ylab("Jackknife residuals")
+p+geom_text(aes(label=ifelse(abs(.jack)>2,.index,"")),hjust=-0.1)
+
+rm(p)
+```
+
+Looking at the above Jackknife residuals as well as the Studentized residuals it appears that points at index 1419 and 1568 deviate even moreso than the other outlier observations.
+
+Performing some outlier tests starting from the largest abnormalities we end up with the aforementioned two values as outliers. Smaller outlier values such as the points at index 942, 580, etc. were also tested but these did not retain a p-value under the below Bonferroni corrected significance level, thus we continue with these two points as our potential outliers.
+
+```{r}
+df <- length(diag$.jack) - length(summary(lm.vars)$coefficients[,1]) - 1
+prob1419 <- 2*(1 - pt(abs(diag$.jack[1419]),df))
+prob1568 <- 2*(1 - pt(abs(diag$.jack[1568]),df))
+alpha <- 0.05
+bonf <- alpha/length(diag$.jack)
+bonfprob <- c(prob1419,prob1568,bonf)
+(bonfprob)
+```
+
+```{r}
+p <- ggplot(diag, aes(x=seq(1:length(.cooksd)),y=.cooksd))+geom_point()
+p <- p + xlab("Index")+ylab("Cooks distance") + theme(legend.position="none")
+p + geom_text(aes(label=ifelse(abs(.cooksd)>0.015,.index,"")))
+
+rm(p)
+```
+
+Here we see the two suspect points but also 4 other extreme data points. It is still unclear whether these points should be removed. We can move on to check where these points appear for our residuals vs. fitted values.
+
+```{r}
+p<- ggplot(diag, aes(x=.fitted,y=.resid))+geom_point()
+p <- p+stat_smooth(method="loess",se=F)+
+geom_hline(yintercept=0, col="red", linetype="dashed")
+res_sd <- summary(lm.vars)$sigma
+p <- p + geom_hline(yintercept = 0, col = "red", linetype = "dashed")
+p <- p + geom_hline(yintercept = 2 * res_sd, col = "blue", linetype = "dashed")
+p <- p + geom_hline(yintercept = -2 * res_sd, col = "blue",
+linetype = "dashed")
+p <- p + geom_hline(yintercept = 3 * res_sd, col = "green",
+linetype = "dashed")
+p <- p + geom_hline(yintercept = -3 * res_sd, col = "green",
+linetype = "dashed")
+p <- p + xlab("Fitted") + ylab("Residuals") + labs(title = "Residuals vs. fitted values")
+p + geom_text(aes(label = ifelse(abs(.resid) > 2 * res_sd,
+.index, "")), hjust = -0.5, vjust = 0.4)
+
+rm(p)
+```
+
+It is easy to spot the extreme data points on this plot aswell, although their effect appears to be minimal on how the model currently fits. Since these points do not have clear defects and do not appear where data is sparse it seems to be alright to keep them in the model.
 
 ## 4 Use test data to evaluate the model
 
+Initially we need to apply the same transforms to the test data as we did with our train data.
 
-### Additional diagnostics
+```{r}
+test$nuvirdi <- log(test$nuvirdi)
+test['log(ibm2)'] <- log(test$ibm2)
+
+predictions <- predict(lm.vars, test)
+predictions <- exp(predictions)
+test$nuvirdi <- exp(test$nuvirdi)
+
+rmse <- sqrt(sum(predictions - test$nuvirdi) ^ 2) / length(test$nuvirdi)
+c(MSE = rmse, R2 = summary(lm.vars)$r.squared) %>%
+  knitr::kable(col.names = NULL)
+```
+
+Comparing the predicted prices to the real ones currently has a mean standard error of 314000 kr. which does not appear too problematic.
+
+```{r}
+test$predictions <- predictions
+
+p <- ggplot(test, aes(x = nuvirdi, y = predictions)) + geom_point()
+p <- p + stat_smooth(method = 'loess', se = F)
+p <- p + xlab('Real') + ylab('Prediction')
+p + xlim(0, 110000)+ylim(0, 110000)
+
+rm(predictions)
+rm(p)
+```
+
+By plotting the real values vs the predicted ones we can see however that as data becomes sparse after the 60000 price variable mark our model starts undervaluing properties.
 
 ## 5 Equation for the final model
+
+```{r}
+data.frame(variable = c("Intercept", "teg_eignIbudareig", "teg_eignParhus", "teg_eignRadhus", "log(ibm2)", "fjbilast", "matssvaedi25", "matssvaedi91", "matssvaedi120", "matssvaedi160", "undirmatssvaedi3", "undirmatssvaedi21", "undirmatssvaedi28", "undirmatssvaedi37", "undirmatssvaedi48", "ibteg12", "date_modifier", "age_category"), estimate = c(7.446740, -0.237073, -0.060374, -0.135298, 0.675780, 0.097430, 0.128079, -0.109615, -0.251388, -0.320513, -0.111752, -0.073770,  0.015409, -0.003709, 0.172091, -0.092976, 0.126362, 0.063852), estimate = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)) %>%
+  knitr::kable(caption = "Final model variables and estimates", col.names = c("Variable", "Estimate", "Beta"))
+```
+
+$$\log{\hat{y}} = \hat{\beta_{0}} + \hat{\beta_{1}}x + \hat{\beta_{2}}x + \hat{\beta_{3}}x + \log{\hat{\beta_{4}}x} + \hat{\beta_{5}}x + \hat{\beta_{6}}x + \hat{\beta_{7}}x + \hat{\beta_{8}}x + \hat{\beta_{9}}x + \hat{\beta_{10}}x + \hat{\beta_{11}}x + \hat{\beta_{12}}x + \hat{\beta_{13}}x \\ + \hat{\beta_{14}}x + \hat{\beta_{15}}x + \hat{\beta_{16}}x + \hat{\beta_{17}}x$$
+
+As the response model is transformed in order to put the equation in the context of the response we use exponents. Therefore the equation for the model becomes:
+
+$$y = e^{7.446740} \cdot e^{-0.237073x} \cdot e^{-0.060374x} \cdot e^{-0.135298x} \cdot 0.675780x \cdot e^{0.097430x} \cdot e^{0.128079x} \cdot e^{-0.109615x} \cdot e^{-0.251388x} \\ \cdot e^{-0.320513x} \cdot e^{-0.111752x} \cdot e^{-0.073770x} \cdot e^{0.015409x} \cdot e^{-0.003709x} \cdot e^{0.172091x} \cdot e^{-0.092976x} \cdot e^{0.126362x} \cdot e^{0.063852x}$$
