@@ -1,0 +1,72 @@
+---
+title: 'Verkefni 6'
+author: 'Jaan Jaerving (jaj20@hi.is)'
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    code_folding: hide
+---
+
+```{r, setup, results = FALSE, message = FALSE, warning = FALSE}
+options(scipen = 999)
+knitr::opts_chunk$set(message = FALSE,
+                      warning = FALSE)
+
+library(ggplot2)
+library(dplyr)
+library(GGally)
+library(MASS)
+
+data(birthwt)
+```
+
+## 1. it a logistic regression model to the low birth weight dataset by using the `glm` function in R. Use all the explanatory variables. Report a summary of the estimates.
+
+Initially we fit a model with everything except for `bwt` (this would obviously allow us to predict perfectly).
+
+```{r}
+glm.1 <- glm(low ~ age+lwt+factor(race)+smoke+ptl+ht+ui+ftv, binomial, birthwt)
+s.1 <- summary(glm.1)
+
+s.1
+```
+
+From the summary above we can see that the initial AIC of the model is 221.28.
+
+The three highest p-values are visible for the variables `ftv`, `age` and `ptl`.
+
+## 2. Use the p-values to identify three explanatory variables that should potentially be removed from the model. Once these three variable have been identified fit all 8 combination of models with these three explanatory variables either in or not in the model. Use AIC to determine the best model out of these 8 models. Report the summary of the selected model.
+
+```{r}
+data.frame(variable = c("ftv+age+ptl", "ftv+age", "ftv+ptl", "age+ptl", "ftv", "ptl", "age", ""), aic = c(221.28, 221.83, 219.93, 219.43, 220.16, 217.99, 219.95, 218.22)) %>%
+  knitr::kable(caption = "Models", col.names = c("Variables", "AIC"))
+
+glm.2 <- glm(low ~ ptl+lwt+factor(race)+smoke+ht+ui, binomial, birthwt)
+s.2 <- summary(glm.2)
+
+s.2
+```
+
+The lowest AIC score is visible for the model that only keeps `ptl`. The summary for that model can be seen above.
+
+## 3. Draw a normal probability plot of the deviance residuals. Do the deviance residuals appear to follow a normal distribution? Draw the deviance residuals versus all the explanatory variables. Are any outliers found when looking at these plots? The deviance residuals are evaluated by the glm function.
+
+```{r}
+plot(density(resid(glm.2, type='deviance')))
+```
+
+## 4. Interpret all the parameters in the model selected in 2.
+
+## 5. What is the probability that the mother will have a baby weighing less than 2500 g? Compute a 95% confidence interval for this probability based on the model selected in 2.
+
+```{r}
+# Hint: The ’vcov()’ function is helpful here
+# age = 33 year old;
+# lwt = 107 lb;
+# race = 2 (black);
+# smoke = 0 (doesn’t smoke);
+# ptl = 0, (no previous premature labours);
+# ht = 1 (hypertension present);
+# ui = 0 (uterine irritability not present);
+# ftv = 0 (number of physician visits during the first trimester is zero).
+```
