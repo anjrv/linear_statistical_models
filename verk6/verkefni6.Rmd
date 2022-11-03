@@ -130,4 +130,13 @@ From the earlier summary we can see that:
 # ht = 1 (hypertension present);
 # ui = 0 (uterine irritability not present);
 # ftv = 0 (number of physician visits during the first trimester is zero).
+
+# For variables Intercept, ptl, lwt, raceblack, raceother, smoke1, ht1, ui1
+X <- c(1, 0, 107, 1, 0, 0, 1, 0)
+std.er <- as.numeric(sqrt(t(X) %*% vcov(glm.2) %*% X))
+
+pred <- predict(glm.2, newdata=data.frame(ptl = 0, lwt = 107, race = 'black', smoke = factor(0), ht = factor(0), ui = factor(0)), type='response')
+estimates <- pred + c(qnorm(0.025), qnorm(0.975)) * std.er
 ```
+
+Odds of given mother having a low birth weight baby are **`r pred`**. Lower confidence interval is **`r estimates[1]`**, upper confidence interval is **`r estimates[2]`**.
