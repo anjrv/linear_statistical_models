@@ -17,19 +17,38 @@ library(dplyr)
 library(GGally)
 library(MASS)
 
-bwt <- with(birthwt, {
-race <- factor(race, labels = c("white", "black", "other"))
-data.frame(low = factor(low), age, lwt, race, smoke,
-           ptl, ht = factor(ht), ui = factor(ui), ftv)
+qqplot.data <- function (vec) {
+  y <- quantile(vec[!is.na(vec)], c(0.25, 0.75))
+  x <- qnorm(c(0.25, 0.75))
+  slope <- diff(y) / diff(x)
+  int <- y[1L] - slope * x[1L]
+  d <- data.frame(resids = vec)
+  ggplot(d, aes(sample = resids)) + stat_qq() + stat_qq_line() + xlab("Standard normal quantiles") + ylab("Deviance residuals")
+}
+
+data <- with(birthwt, {
+  race <- factor(race, labels = c("white", "black", "other"))
+  data.frame(
+    low = factor(low),
+    age,
+    lwt,
+    race,
+    smoke = factor(smoke),
+    ptl,
+    ht = factor(ht),
+    ui = factor(ui),
+    ftv,
+    bwt
+  )
 })
 ```
 
-## 1. it a logistic regression model to the low birth weight dataset by using the `glm` function in R. Use all the explanatory variables. Report a summary of the estimates.
+## 1. Fit a logistic regression model to the low birth weight dataset by using the `glm` function in R. Use all the explanatory variables. Report a summary of the estimates.
 
 Initially we fit a model with everything except for `bwt` (this would obviously allow us to predict perfectly).
 
 ```{r}
-glm.1 <- glm(low ~ age+lwt+race+smoke+ptl+ht+ui+ftv, binomial, bwt)
+glm.1 <- glm(low ~ age+lwt+race+smoke+ptl+ht+ui+ftv, binomial, data)
 s.1 <- summary(glm.1)
 
 s.1
@@ -45,7 +64,7 @@ The three highest p-values are visible for the variables `ftv`, `age` and `ptl`.
 data.frame(variable = c("ftv+age+ptl", "ftv+age", "ftv+ptl", "age+ptl", "ftv", "ptl", "age", ""), aic = c(221.28, 221.83, 219.93, 219.43, 220.16, 217.99, 219.95, 218.22)) %>%
   knitr::kable(caption = "Models", col.names = c("Variables", "AIC"))
 
-glm.2 <- glm(low ~ ptl+lwt+factor(race)+smoke+ht+ui, binomial, birthwt)
+glm.2 <- glm(low ~ ptl+lwt+race+smoke+ht+ui, binomial, data)
 s.2 <- summary(glm.2)
 
 s.2
@@ -56,23 +75,48 @@ The lowest AIC score is visible for the model that only keeps `ptl`. The summary
 ## 3. Draw a normal probability plot of the deviance residuals. Do the deviance residuals appear to follow a normal distribution? Draw the deviance residuals versus all the explanatory variables. Are any outliers found when looking at these plots? The deviance residuals are evaluated by the glm function.
 
 ```{r}
-qqnorm(residuals(glm.2, type="deviance"))
-abline(a=0,b=1)
+resids <- residuals(glm.2, type="deviance")
+qqplot.data(resids)
+```
+As we can see the residuals for the model are not normally distributed and do not necessarily approach a normal distribution if we duplicate rows to add data. This kind of normal probability plot is likely not useful to analyse the performance of this model.
+
+```{r}
+ggplot(data, aes(ptl, resids)) + geom_point() + xlab("Previous premature labours") + ylab("Deviance residuals")
 ```
 
 ```{r}
-plot(birthwt$smoke, residuals(glm.2, type="deviance"))
+ggplot(data, aes(lwt, resids)) + geom_point() + xlab("Mother's weight in pounds") + ylab("Deviance residuals")
 ```
 
 ```{r}
-plot(birthwt$lwt, residuals(glm.2, type="deviance"))
+ggplot(data, aes(smoke, resids)) + geom_boxplot() + xlab("Smoking status during pregnancy") + ylab("Deviance residuals")
 ```
 
 ```{r}
-plot(factor(birthwt$race), residuals(glm.2, type="deviance"))
+ggplot(data, aes(race, resids)) + geom_boxplot() + xlab("Mother's race") + ylab("Deviance residuals")
 ```
+
+```{r}
+ggplot(data, aes(ht, resids)) + geom_boxplot() + xlab("History of hypertension") + ylab("Deviance residuals")
+```
+
+```{r}
+ggplot(data, aes(ui, resids)) + geom_boxplot() + xlab("Presence of uterine irritability") + ylab("Deviance residuals")
+```
+
+In general for all these explanatory variables we see no points that are three standard deviations from the mean so no points can be considered outliers for this current dataset. We do see more variance in the groups that have more values, this is visible e.g. for smoking status as well as race.
 
 ## 4. Interpret all the parameters in the model selected in 2.
+
+From the earlier summary we can see that:
+
+* Each previous premature labour increases the odds of giving birth to a low birth weight baby by **`r s.2$coefficients["ptl", "Estimate"]`** log odds.
+* Each additional pound during the mother's last menstrual period decreases these odds. Change in log odds for `lwt` is **`r s.2$coefficients["lwt", "Estimate"]`**
+* The mother being black increases the log odds by **`r s.2$coefficients["raceblack", "Estimate"]`**
+* The mother being a race other than black or white increases the log odds by **`r s.2$coefficients["raceblack", "Estimate"]`**
+* If the mother smoked during pregnancy log odds are increased by **`r s.2$coefficients["smoke1", "Estimate"]`**
+* If the mother has a history of hypertension the log odds are increased by **`r s.2$coefficients["ht1", "Estimate"]`**
+* If the presence of uterine irritability was detected during pregnancy then the log odds also increased by **`r s.2$coefficients["ui1", "Estimate"]`**
 
 ## 5. What is the probability that the mother will have a baby weighing less than 2500 g? Compute a 95% confidence interval for this probability based on the model selected in 2.
 
